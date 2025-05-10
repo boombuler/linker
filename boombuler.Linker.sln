@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35728.132
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "boombuler.Linker", "boombuler.Linker\boombuler.Linker.csproj", "{A198D6F8-4E15-41CE-8F82-26186435E169}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "boombuler.Linker.Tests", "boombuler.Linker.Tests\boombuler.Linker.Tests.csproj", "{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+		Stryker|Any CPU = Stryker|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Stryker|Any CPU.ActiveCfg = Debug|Any CPU
+		{A198D6F8-4E15-41CE-8F82-26186435E169}.Stryker|Any CPU.Build.0 = Debug|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Stryker|Any CPU.ActiveCfg = Stryker|Any CPU
+		{8B9377AB-A022-471A-A9F4-E1B1333D0BCD}.Stryker|Any CPU.Build.0 = Stryker|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
