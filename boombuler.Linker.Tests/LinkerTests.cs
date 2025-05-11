@@ -138,7 +138,6 @@ public sealed class LinkerTests
         Assert.ThrowsException<ArgumentOutOfRangeException>(() => linker.Link([module], ms));
     }
 
-
     [TestMethod]
     public void Applying_Patches__Resolves_Symbols()
     {
@@ -188,6 +187,31 @@ public sealed class LinkerTests
 
         Assert.AreEqual(0x03, ms.Length);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x07, 0x00 }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Non_Imported_Symbols__Have_to_be_resolved()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(0x05));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Symbols = new[] {
+                Symbol.Internal,
+            }.ToImmutableArray(),
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 1,
+                    Data = new byte[] { 0x00 },
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
     }
 
     [TestMethod]

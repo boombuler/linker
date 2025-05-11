@@ -64,7 +64,6 @@ public class PatchTests
         CollectionAssert.AreEqual(new byte[] { (byte)expected }, ms.ToArray());
     }
 
-
     [TestMethod]
     [DataRow(0x0123456789ABCDEFu)]
     [DataRow(0x0u)]
