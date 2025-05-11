@@ -14,13 +14,13 @@ public sealed class LinkerTests
     private static readonly RegionName _Text = new RegionName(".text");
     private static readonly RegionName _Data = new RegionName(".data");
 
-    class SimpleTarget(ushort textStart = 0x0000) : ITargetConfiguration<ushort>
+    class SimpleTarget(ushort textStart = 0x0000, ushort? dataStart = null) : ITargetConfiguration<ushort>
     {
         public IEnumerable<Anchor<ushort>> Anchors => [];
 
         public IEnumerable<Region<ushort>> Regions => [
             new Region<ushort>(_Text, textStart, Output: true),
-            new Region<ushort>(_Data, Output: true),
+            new Region<ushort>(_Data, dataStart, Output: true),
         ];
     }
 
@@ -408,5 +408,28 @@ public sealed class LinkerTests
 
         Assert.AreEqual(11, ms.Length);
         CollectionAssert.AreEqual(new byte[] { 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Section_with_too_little_Data__Are_filled_with_Zeros()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 3,
+                    Data = new byte[] { 0x01 },
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        CollectionAssert.AreEqual(new byte[] { 0x01, 0x00, 0x00 }, ms.ToArray());
     }
 }

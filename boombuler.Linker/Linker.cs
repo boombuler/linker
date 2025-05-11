@@ -150,19 +150,25 @@ public class Linker<TAddr>
             {
                 FillTo(sect.Origin!.Value);
 
-                if (sect.Section.Data.Length != int.CreateTruncating(sect.Section.Size))
-                    throw new InvalidOperationException($"Section {sect.Section} has a size mismatch. Expected {sect.Section.Size}, but got {sect.Section.Data.Length}.");
+                ReadOnlyMemory<byte> data = sect.Section.Data;
+                var expectedLength = int.CreateTruncating(sect.Section.Size);
+                if (data.Length < expectedLength)
+                {
+                    var paddedData = new byte[expectedLength];
+                    data.CopyTo(paddedData);
+                    data = paddedData;
+                }
 
                 var rt = patchers.GetValueOrDefault(sect.Module) ?? StaticPatchRuntime;
                 int dataPos = 0;
                 foreach(var p in sect.Section.Patches.OrderBy(o => o.Location))
                 {
                     var patchOffset = int.CreateTruncating(p.Location);
-                    target.Write(sect.Section.Data.Span[dataPos..patchOffset]);
+                    target.Write(data.Span[dataPos..patchOffset]);
                     rt.Run(sect.Origin!.Value + p.Location, p.Size, p.Expressions, target);
                     dataPos = patchOffset + p.Size;
                 }
-                target.Write(sect.Section.Data.Span[dataPos..]);
+                target.Write(data.Span[dataPos..]);
                 pos += sect.Section.Size;
             }
         }
