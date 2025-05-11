@@ -32,6 +32,7 @@ public class Linker<TAddr>
         var sections = (
             from mod in modules
             from sect in mod.Sections
+            where sect.Size > TAddr.Zero
             select new ResolvedSection()
             {
                 Module = mod,

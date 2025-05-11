@@ -191,6 +191,32 @@ public sealed class LinkerTests
     }
 
     [TestMethod]
+    public void Empty_Sections__Are_Ignored()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(0x05));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Symbols = new[] {
+                Symbol.Internal,
+            }.ToImmutableArray(),
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 0,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+
+        Assert.AreEqual(0, ms.Length);
+    }
+
+    [TestMethod]
     public void Exported_Symbols__Can_Be_Resolved()
     {
         var linker = new Linker<ushort>(new SimpleTarget());
