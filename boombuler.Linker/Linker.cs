@@ -142,8 +142,6 @@ public class Linker<TAddr>
             {
                 if (pos == TAddr.Zero)
                     pos = start;
-                else 
-                    FillTo(start);
             }
 
             foreach (var sect in regionMap[region.Name].OrderBy(s => s.Origin))
