@@ -2,7 +2,7 @@
 
 using System.Diagnostics;
 
-enum ExpressionType
+public enum ExpressionType
 {
     Push = 0, // Push a single Immediate Value
     Add = 1,
@@ -19,7 +19,7 @@ enum ExpressionType
 }
 
 [DebuggerDisplay("{Type} {ValueDebuggerDisplay,nq}")]
-readonly struct Expression
+public readonly struct Expression
 {
     public ExpressionType Type { get; init; }
     public ulong Value { get; init; }

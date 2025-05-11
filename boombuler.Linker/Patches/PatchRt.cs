@@ -14,48 +14,27 @@ class PatchRt<TAddr>
         fResolveSymbol = resolveSymbol;
     }
 
-    public void Run(TAddr targetAddress, byte targetSize, ReadOnlySpan<byte> patches, Span<byte> target)
-    {
-        List<Expression> expressions = new List<Expression>();
-        while (patches.Length > 0)
-            expressions.Add(Expression.Read(ref patches));
-        Run(targetAddress, targetSize, expressions, target);
-    }
-
-    public void Run(TAddr targetAddress, byte targetSize, IEnumerable<Expression> expressions, Span<byte> target)
+    public void Run(TAddr targetAddress, byte targetSize, IEnumerable<Expression> expressions, Stream target)
     {
         var state = new Stack<ulong>();
-
-        if (target.Length < targetSize)
-            throw new ArgumentException($"Target buffer must be at least {targetSize} bytes long", nameof(target));
 
         foreach(var patch in expressions)
             Apply(targetAddress, patch, state);
 
         if (state.Count != 1)
             throw new InvalidOperationException($"Invalid Patch instructions. Stack contains {state.Count} items.");
+        
         WriteResult(targetSize, state.Peek(), target);
     }
 
-
-    protected virtual void WriteResult(byte targetSize, ulong value, Span<byte> target)
+    protected virtual void WriteResult(byte targetSize, ulong value, Stream target)
     {
-        switch (targetSize)
+        // Stryker disable equality
+        while (targetSize-- > 0)
+        // Stryker restore equality
         {
-            case 1:
-                MemoryMarshal.Write(target, (byte)value);
-                break;
-            case 2:
-                MemoryMarshal.Write(target, (ushort)value);
-                break;
-            case 4:
-                MemoryMarshal.Write(target, (uint)value);
-                break;
-            case 8:
-                MemoryMarshal.Write(target, value);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(targetSize), $"Target size {targetSize} is not supported");
+            target.WriteByte((byte)value);
+            value >>= 8;
         }
     }
 
@@ -108,7 +87,7 @@ class PatchRt<TAddr>
             case ExpressionType.CurrentAdress:
                 state.Push(ulong.CreateTruncating(targetAddress)); break;
             case ExpressionType.SymbolAdress:
-                var symbol = new SymbolId(int.CreateTruncating(state.Pop()));
+                var symbol = new SymbolId((int)express.Value);
                 state.Push(ulong.CreateTruncating(fResolveSymbol(symbol)));
                 break;
             default:

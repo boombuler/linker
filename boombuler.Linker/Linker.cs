@@ -4,12 +4,16 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using boombuler.Linker.Module;
+using boombuler.Linker.Patches;
 using boombuler.Linker.Target;
 
 public class Linker<TAddr>
     where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, IComparable<TAddr>, IComparisonOperators<TAddr, TAddr, bool>
 {
     private readonly ITargetConfiguration<TAddr> fTargetSystem;
+
+    private static readonly PatchRt<TAddr> StaticPatchRuntime =
+        new PatchRt<TAddr>(s => throw new InvalidOperationException($"Unable to resolve symbol {s}")); 
 
     class ResolvedSection
     {
@@ -45,12 +49,62 @@ public class Linker<TAddr>
             start = AssignOrigins(start, regionMap[region.Name]);
         }
 
-        // ToDo: Patch the sections
+        var patchers = CreatePatchRuntimes(sections);
 
-        WriteOutput(target, regionMap);
+        WriteOutput(target, patchers, regionMap);
     }
 
-    private void WriteOutput(Stream target, ILookup<RegionName, ResolvedSection> regionMap)
+    private static Dictionary<Module<TAddr>, PatchRt<TAddr>> CreatePatchRuntimes(List<ResolvedSection> sections)
+    {
+        var symAddrs =
+            from sect in sections
+            from symAdr in sect.Section.SymbolAddresses
+            let sym = sect.Module.GetSymbol(symAdr.Key)
+            select new
+            {
+                sect.Module,
+                SymbolId = symAdr.Key,
+                Symbol = sym,
+                Address = sect.Origin!.Value + symAdr.Value
+            };
+
+        var exports = symAddrs
+            .Where(s => s.Symbol.Type == SymbolType.Exported)
+            .ToLookup(s => s.Symbol.Name, s => new { s.Address, ModuleName = s.Module.Name });
+
+        var runtimes = new Dictionary<Module<TAddr>, PatchRt<TAddr>>();
+
+        foreach (var mod in sections.Select(s => s.Module).Distinct())
+        {
+            var modAddresses = symAddrs
+                .Where(sa => sa.Module == mod)
+                .ToDictionary(sa => sa.SymbolId, sa => sa.Address);
+
+            foreach (var (id, sym) in mod.GetSymbols())
+            {
+                if (sym.Type == SymbolType.Imported)
+                {
+                    var addrs = exports[sym.Name].ToList();
+                    switch (addrs.Count)
+                    {
+                        case 0:
+                            throw new InvalidOperationException($"Symbol {sym.Name} is imported, but not found in any module.");
+                        case 1:
+                            modAddresses[id] = addrs[0].Address; break;
+                        default:
+                            throw new InvalidOperationException($"Symbol {sym.Name} is imported multiple times. Found in {string.Join(", ", addrs.Select(a => a.ModuleName))}.");
+                    }
+                }
+                else if (!modAddresses.ContainsKey(id)) // Check Internal or exported symbols
+                    throw new InvalidOperationException($"Symbol {sym.Name} is not defined in module {mod.Name}.");
+            }
+
+            runtimes[mod] = new PatchRt<TAddr>(s => modAddresses[s]);
+        }
+        return runtimes;
+    }
+
+    private void WriteOutput(Stream target, Dictionary<Module<TAddr>, PatchRt<TAddr>> patchers, ILookup<RegionName, ResolvedSection> regionMap)
     {
         var pos = TAddr.Zero;
         void FillTo(TAddr newPos)
@@ -77,7 +131,17 @@ public class Linker<TAddr>
 
                 if (sect.Section.Data.Length != int.CreateTruncating(sect.Section.Size))
                     throw new InvalidOperationException($"Section {sect.Section} has a size mismatch. Expected {sect.Section.Size}, but got {sect.Section.Data.Length}.");
-                target.Write(sect.Section.Data.Span);
+
+                var rt = patchers.GetValueOrDefault(sect.Module) ?? StaticPatchRuntime;
+                int dataPos = 0;
+                foreach(var p in sect.Section.Patches.OrderBy(o => o.Location))
+                {
+                    var patchOffset = int.CreateTruncating(p.Location);
+                    target.Write(sect.Section.Data.Span[dataPos..patchOffset]);
+                    rt.Run(sect.Origin!.Value + p.Location, p.Size, p.Expressions, target);
+                    dataPos = patchOffset + p.Size;
+                }
+                target.Write(sect.Section.Data.Span[dataPos..]);
                 pos += sect.Section.Size;
             }
         }

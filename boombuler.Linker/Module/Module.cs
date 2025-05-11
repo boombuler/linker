@@ -17,4 +17,12 @@ public class Module<TAddr>
             throw new ArgumentOutOfRangeException("Invalid Symbol-Id");
         return Symbols[id.Value];
     }
+
+    public IEnumerable<(SymbolId Id, Symbol Symbol)> GetSymbols()
+    {
+        for (var i = 0; i < Symbols.Length; i++)
+        {
+            yield return (new SymbolId(i), Symbols[i]);
+        }
+    }
 }
