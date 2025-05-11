@@ -88,6 +88,118 @@ public sealed class LinkerTests
     }
 
     [TestMethod]
+    public void Linking_a_Region_with_Origin_Outside_of_Region__Throws_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(0x0100));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0010,
+                    Data = new byte[] { 0x01, 0x02, 0x03 },
+                    Size = 3,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    public void The_Order_Of_Sections___Does_not_Matter()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0002,
+                    Data = new byte[] { 0x01, 0x02, 0x03 },
+                    Size = 3,
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0000,
+                    Data = new byte[] { 0x8F },
+                    Size = 1,
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Data = new byte[] { 0x11 },
+                    Size = 1,
+                },
+            }.ToImmutableArray()
+        };
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        Assert.AreEqual(0x05, ms.Length);
+        CollectionAssert.AreEqual(new byte[] { 0x8F, 0x11, 0x01, 0x02, 0x03 }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Overlapping_Sections__Throws_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0002,
+                    Data = new byte[] { 0x01, 0x02, 0x03 },
+                    Size = 3,
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0001,
+                    Data = new byte[] { 0x00, 0x00 },
+                    Size = 2,
+                },
+            }.ToImmutableArray()
+        };
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    public void Non_Overlapping_Sections__Dont_throw_exceptions()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0002,
+                    Data = new byte[] { 0x01, 0x02, 0x03 },
+                    Size = 3,
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0000,
+                    Data = new byte[] { 0xF0, 0x0F },
+                    Size = 2,
+                },
+            }.ToImmutableArray()
+        };
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        CollectionAssert.AreEqual(new byte[] { 0xF0, 0x0F, 0x01, 0x02, 0x03 }, ms.ToArray());
+    }
+
+    [TestMethod]
     public void Region_Start_Addresses__Move_the_output()
     {
         var linker = new Linker<ushort>(new SimpleTarget(0x05));

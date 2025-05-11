@@ -40,6 +40,15 @@ public class Linker<TAddr>
                 Origin = GetFixedOrigin(mod, sect)
             }
         ).ToList();
+
+        AssertNotOverlapping((
+            from s in sections
+            where s.Origin.HasValue
+            let origin = s.Origin!.Value
+            orderby origin
+            select (origin, origin + s.Section.Size)
+        ).ToList());
+
         var regionMap = sections.ToLookup(s => s.Section.Region);
 
         TAddr start = TAddr.Zero;
@@ -53,6 +62,17 @@ public class Linker<TAddr>
         var patchers = CreatePatchRuntimes(sections);
 
         WriteOutput(target, patchers, regionMap);
+    }
+
+    private void AssertNotOverlapping(List<(TAddr Start, TAddr End)> sections)
+    {
+        for (int i = 1; i < sections.Count; i++)
+        {
+            var cur = sections[i];
+            var prev = sections[i - 1];
+            if (prev.End > cur.Start)
+                throw new InvalidOperationException($"Sections overlap at address {cur.Start}");
+        }
     }
 
     private static Dictionary<Module<TAddr>, PatchRt<TAddr>> CreatePatchRuntimes(List<ResolvedSection> sections)
