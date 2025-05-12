@@ -13,10 +13,11 @@ public sealed class LinkerTests
 {
     private static readonly RegionName _Text = new RegionName(".text");
     private static readonly RegionName _Data = new RegionName(".data");
+    private static readonly SymbolName Anchor = new SymbolName("Anchor");
 
     class SimpleTarget(ushort textStart = 0x0000, ushort? dataStart = null) : ITargetConfiguration<ushort>
     {
-        public IEnumerable<Anchor<ushort>> Anchors => [];
+        public IEnumerable<Anchor<ushort>> Anchors => [new Anchor<ushort>(Anchor, 0x05)];
 
         public IEnumerable<Region<ushort>> Regions => [
             new Region<ushort>(_Text, textStart, Output: true),
@@ -539,6 +540,66 @@ public sealed class LinkerTests
                 new Section<ushort>() {
                     Region = _Text,
                     Size = (ushort)size,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+
+    [TestMethod]
+    public void Anchors__Set_Section_Origin()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Symbols = new[] {
+                new Symbol(Anchor, SymbolType.Internal),
+            }.ToImmutableArray(),
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    SymbolAddresses = new Dictionary<SymbolId, ushort>() {
+                        [new SymbolId(0)] = 0x0001,
+                    }.ToFrozenDictionary(),
+                    Data = new byte[] { 0x02, 0x01 },
+                    Size = 1,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x00, 0x00, 0x00, 0x02, 0x01 }, ms.ToArray());
+    }
+
+
+    [TestMethod]
+    public void Clashing_Origins__Throw_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Symbols = new[] {
+                new Symbol(Anchor, SymbolType.Internal),
+            }.ToImmutableArray(),
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0000,
+                    SymbolAddresses = new Dictionary<SymbolId, ushort>() {
+                        [new SymbolId(0)] = 0x0000,
+                    }.ToFrozenDictionary(),
+                    Data = new byte[] { 0x01 },
+                    Size = 1,
                 },
             }.ToImmutableArray()
         };
