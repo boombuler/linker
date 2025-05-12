@@ -1,6 +1,7 @@
 ﻿namespace boombuler.Linker;
 
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Numerics;
 using boombuler.Linker.Module;
@@ -8,9 +9,12 @@ using boombuler.Linker.Patches;
 using boombuler.Linker.Target;
 
 public class Linker<TAddr>
-    where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, IComparable<TAddr>, IComparisonOperators<TAddr, TAddr, bool>
+    where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, 
+                  IComparable<TAddr>, IComparisonOperators<TAddr, TAddr, bool>,
+                  IModulusOperators<TAddr, TAddr, TAddr>
 {
     private readonly ITargetConfiguration<TAddr> fTargetSystem;
+    private readonly FrozenDictionary<Region<TAddr>, TAddr> fRegionEnd;
 
     private static readonly PatchRt<TAddr> StaticPatchRuntime =
         new PatchRt<TAddr>(s => throw new InvalidOperationException($"Unable to resolve symbol {s}")); 
@@ -25,6 +29,17 @@ public class Linker<TAddr>
     public Linker(ITargetConfiguration<TAddr> targetSystem)
     {
         fTargetSystem = targetSystem ?? throw new ArgumentNullException(nameof(targetSystem));
+
+        var endAddr = TAddr.Zero - TAddr.One;
+        var endAddrs = new Dictionary<Region<TAddr>, TAddr>();
+        foreach(var r in fTargetSystem.Regions.Reverse())
+        {
+            endAddrs[r] = endAddr;
+            if (r.StartAddress.HasValue)
+                endAddr = r.StartAddress.Value - TAddr.One;
+        }
+
+        fRegionEnd = endAddrs.ToFrozenDictionary();
     }
 
     public void Link(IEnumerable<Module<TAddr>> modules, Stream target)
@@ -56,7 +71,7 @@ public class Linker<TAddr>
         {
             if (region.StartAddress.HasValue)
                 start = region.StartAddress.Value;
-            start = AssignOrigins(start, regionMap[region.Name]);
+            start = AssignOrigins(start, fRegionEnd[region], regionMap[region.Name]);
         }
 
         var patchers = CreatePatchRuntimes(sections);
@@ -172,7 +187,7 @@ public class Linker<TAddr>
         }
     }
 
-    private TAddr AssignOrigins(TAddr regionStart, IEnumerable<ResolvedSection> sections)
+    private TAddr AssignOrigins(TAddr regionStart, TAddr regionEnd, IEnumerable<ResolvedSection> sections)
     {
         var usedSpace = new List<(TAddr start, TAddr end)>();
         if (regionStart != TAddr.Zero)
@@ -194,10 +209,15 @@ public class Linker<TAddr>
             {
                 if ((addr + sect.Section.Size) <= start)
                     break;
-                addr = end;
+                addr = Align(end, sect.Section.Alignment);
             }
             sect.Origin = addr;
-            var range = (addr, addr + sect.Section.Size);
+
+            var endAddr = addr + sect.Section.Size;
+            if (endAddr < addr || endAddr > regionEnd)
+                throw new InvalidOperationException($"Unable to link {sect.Section.Region.Value}. Not enough space.");
+
+            var range = (addr, endAddr);
 
             var idx = usedSpace.FindIndex(o => o.start > addr);
             if (idx == -1)
@@ -206,6 +226,15 @@ public class Linker<TAddr>
                 usedSpace.Insert(idx, range);
         }
         return usedSpace[^1].end;
+    }
+
+    private static TAddr Align(TAddr addr, TAddr alignment)
+    {
+        if (alignment == TAddr.One)
+            return addr;
+
+        var overflow = addr % alignment;
+        return addr + (alignment - overflow);
     }
 
     private TAddr? GetFixedOrigin(Module<TAddr> mod, Section<TAddr> sect)

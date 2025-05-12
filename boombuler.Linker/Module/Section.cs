@@ -13,7 +13,7 @@ public record Section<TAddr>
     public FrozenDictionary<SymbolId, TAddr> SymbolAddresses { get; init; } = FrozenDictionary<SymbolId, TAddr>.Empty;
 
     public TAddr? Origin { get; init; } = null;
-    public TAddr? Alignment { get; init; } = null;
+    public TAddr Alignment { get; init; } = TAddr.One;
 
     public TAddr Size { get; init; } = TAddr.Zero;
 

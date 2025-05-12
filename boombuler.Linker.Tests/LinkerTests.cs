@@ -432,4 +432,83 @@ public sealed class LinkerTests
         linker.Link([module], ms);
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x00, 0x00 }, ms.ToArray());
     }
+
+    [TestMethod]
+    public void Alignment__Is_applied_when_arranging_Sections()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 1,
+                    Origin = 0,
+                    Data = new byte[] { 0x01 },
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 1,
+                    Alignment = 4,
+                    Data = new byte[] { 0x02 },
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        CollectionAssert.AreEqual(new byte[] { 0x01, 0x00, 0x00, 0x00, 0x02 }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Oversized_Sections__throw_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 0x10,
+                },
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 0xFFF7,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    [DataRow(0xFFFFu)]
+    [DataRow(0x000Au)]
+    [DataRow(0x000Bu)]
+    public void Oversized_Sections_in_fixed_size_Regions__throw_an_Exception(uint size)
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(0x0000, 0x000A));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = (ushort)size,
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
 }
