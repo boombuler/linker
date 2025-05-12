@@ -275,7 +275,7 @@ public sealed class LinkerTests
                     Patches = new ReadOnlyCollection<Patch<ushort>>([
                         new Patch<ushort>() {
                             Size = 1,
-                            Location = 1,
+                            Location = 2,
                             Expressions =
                             [
                                 Expression.SymbolAdress(new SymbolId(0)),
@@ -298,7 +298,42 @@ public sealed class LinkerTests
         linker.Link([module], ms);
 
         Assert.AreEqual(0x03, ms.Length);
-        CollectionAssert.AreEqual(new byte[] { 0x05, 0x07, 0x00 }, ms.ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x05, 0x00, 0x07 }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Current_Address__Can_be_patched_in()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = new[]
+            {
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0001,
+                    Size = 3,
+                    Patches = new ReadOnlyCollection<Patch<ushort>>([
+                        new Patch<ushort>() {
+                            Size = 1,
+                            Location = 2,
+                            Expressions =
+                            [
+                                Expression.CurrentAdress,
+                            ],
+                        },
+                    ])
+                },
+            }.ToImmutableArray()
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+
+        Assert.AreEqual(0x04, ms.Length);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x00, 0x00, 0x03 }, ms.ToArray());
     }
 
     [TestMethod]
