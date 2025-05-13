@@ -1,7 +1,6 @@
 ﻿namespace boombuler.Linker.Patches;
 
 using System.Numerics;
-using System.Runtime.InteropServices;
 
 class PatchRt<TAddr> 
     where TAddr : INumberBase<TAddr>
