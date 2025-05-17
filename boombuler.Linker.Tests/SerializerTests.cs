@@ -1,6 +1,5 @@
 ﻿namespace boombuler.Linker.Tests;
 
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Numerics;
 using boombuler.Linker.Module;
@@ -12,7 +11,7 @@ public class SerializerTests
         where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>
     {
         using var stream = new MemoryStream();
-        var serializer = new ModuleSerializer();
+        var serializer = new ModuleSerializer<TAddr>();
         serializer.Serialize(module, stream);
         return stream.ToArray();
     }
@@ -24,14 +23,14 @@ public class SerializerTests
         CollectionAssert.AreEqual(new byte[] {
             0x42, 0x4C, 0x4B, 0x01,       // Magic Number + Address Length
             0x04, 0x54, 0x65, 0x73, 0x74, // Module Name
-            0x00, 0x00                    // Symbol Count
+            0x00, 0x00,                   // Symbol + Section Count
         }, mod);
 
         mod = Serialize(new Module<ushort>() { Name = "Test" });
         CollectionAssert.AreEqual(new byte[] { 
             0x42, 0x4C, 0x4B, 0x02,       // Magic Number + Address Length
             0x04, 0x54, 0x65, 0x73, 0x74, // Module Name
-            0x00, 0x00                    // Symbol Count
+            0x00, 0x00,                   // Symbol + Section Count
         }, mod);
 
         
@@ -39,14 +38,14 @@ public class SerializerTests
         CollectionAssert.AreEqual(new byte[] {
             0x42, 0x4C, 0x4B, 0x04,       // Magic Number + Address Length
             0x04, 0x54, 0x65, 0x73, 0x74, // Module Name
-            0x00, 0x00                    // Symbol Count
+            0x00, 0x00,                   // Symbol + Section Count
         }, mod);
 
         mod = Serialize(new Module<ulong>() { Name = "Test" });
         CollectionAssert.AreEqual(new byte[] {
             0x42, 0x4C, 0x4B, 0x08,       // Magic Number + Address Length
             0x04, 0x54, 0x65, 0x73, 0x74, // Module Name
-            0x00, 0x00                    // Symbol Count
+            0x00, 0x00,                   // Symbol + Section Count
         }, mod);
     }
 
@@ -64,7 +63,7 @@ public class SerializerTests
         CollectionAssert.AreEqual(new byte[] {
             0x42, 0x4C, 0x4B, 0x02,             // Magic Number + Address Length
             0x04, 0x54, 0x65, 0x73, 0x74,       // Module Name
-            0x03, 0x00,                         // Symbol Count
+            0x03,                               // Symbol Count
             0x01, 0x06,                         // Export + Global Length
             0x45, 0x78, 0x70, 0x6F, 0x72, 0x74, //   .GlobalName
             0x00,                               //   .Local Length
@@ -72,6 +71,7 @@ public class SerializerTests
             0x49, 0x6D, 0x70, 0x6F, 0x72, 0x74, //   .GlobalName
             0x05, 0x4C, 0x6F, 0x63, 0x61, 0x6C, //   .LocalLength + .LocalName
             0x00, 0x00, 0x00,                   // Internal Symbol without Name
+            0x00, 
         }, mod);
     }
 }
