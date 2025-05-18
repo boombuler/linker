@@ -1,6 +1,7 @@
 ﻿namespace boombuler.Linker.Module;
 
 using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Numerics;
 using boombuler.Linker.Patches;
@@ -19,5 +20,5 @@ public record Section<TAddr>
 
     public ReadOnlyMemory<byte> Data { get; init; } = ReadOnlyMemory<byte>.Empty;
 
-    public ReadOnlyCollection<Patch<TAddr>> Patches { get; init; } = ReadOnlyCollection<Patch<TAddr>>.Empty;
+    public ImmutableArray<Patch<TAddr>> Patches { get; init; } = ImmutableArray<Patch<TAddr>>.Empty;
 }

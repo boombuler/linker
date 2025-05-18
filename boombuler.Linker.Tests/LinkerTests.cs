@@ -2,8 +2,6 @@
 
 using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using boombuler.Linker.Module;
 using boombuler.Linker.Patches;
 using boombuler.Linker.Target;
@@ -34,8 +32,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new []
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0002,
@@ -47,7 +44,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x8F },
                     Size = 1,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -65,8 +62,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0002,
@@ -78,7 +74,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x13, 0x37 },
                     Size = 2,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -96,15 +92,14 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0010,
                     Data = new byte[] { 0x01, 0x02, 0x03 },
                     Size = 3,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -118,8 +113,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0002,
@@ -137,7 +131,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x11 },
                     Size = 1,
                 },
-            }.ToImmutableArray()
+            ]
         };
         using var ms = new MemoryStream();
         linker.Link([module], ms);
@@ -152,8 +146,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0002,
@@ -166,7 +159,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x00, 0x00 },
                     Size = 2,
                 },
-            }.ToImmutableArray()
+            ]
         };
         using var ms = new MemoryStream();
         Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
@@ -179,8 +172,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0002,
@@ -193,7 +185,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0xF0, 0x0F },
                     Size = 2,
                 },
-            }.ToImmutableArray()
+            ]
         };
         using var ms = new MemoryStream();
         linker.Link([module], ms);
@@ -208,14 +200,13 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Data = new byte[] { 0x01, 0x02, 0x03 },
                     Size = 3,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -235,8 +226,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 1,
@@ -244,7 +234,7 @@ public sealed class LinkerTests
                         [new SymbolId(symbolId)] = 0x0000,
                     }.ToFrozenDictionary()
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -259,12 +249,11 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Symbols = new[] {
+            Symbols = [
                 Symbol.Internal, 
                 Symbol.Internal,
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Data = new byte[] { 0x00, 0x00, 0x00 },
@@ -273,7 +262,7 @@ public sealed class LinkerTests
                         [new SymbolId(0)] = 0x0002,
                         [new SymbolId(1)] = 0x0000,
                     }.ToFrozenDictionary(),
-                    Patches = new ReadOnlyCollection<Patch<ushort>>([
+                    Patches = [
                         new Patch<ushort>() {
                             Size = 1,
                             Location = 2,
@@ -290,9 +279,9 @@ public sealed class LinkerTests
                                 Expression.SymbolAdress(new SymbolId(1)),
                             ],
                         },
-                    ])
+                    ]
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -310,13 +299,12 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0001,
                     Size = 3,
-                    Patches = new ReadOnlyCollection<Patch<ushort>>([
+                    Patches = [
                         new Patch<ushort>() {
                             Size = 1,
                             Location = 2,
@@ -325,9 +313,9 @@ public sealed class LinkerTests
                                 Expression.CurrentAdress,
                             ],
                         },
-                    ])
+                    ]
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -345,17 +333,14 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Symbols = new[] {
-                Symbol.Internal,
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [ Symbol.Internal ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 1,
                     Data = new byte[] { 0x00 },
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -370,16 +355,13 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Symbols = new[] {
-                Symbol.Internal,
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [ Symbol.Internal ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 0,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -396,11 +378,8 @@ public sealed class LinkerTests
         var modExport = new Module<ushort>()
         {
             Name = "Export",
-            Symbols = new[] {
-                new Symbol(new SymbolName("Export"), SymbolType.Exported)
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [ new Symbol(new SymbolName("Export"), SymbolType.Exported) ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Data = new byte[] { 0x0F },
@@ -410,22 +389,19 @@ public sealed class LinkerTests
                         [new SymbolId(0)] = 0x0000,
                     }.ToFrozenDictionary(),
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         var modImport = new Module<ushort>()
         {
             Name = "Import",
-            Symbols = new[] {
-                new Symbol(new SymbolName("Export"), SymbolType.Imported)
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [ new Symbol(new SymbolName("Export"), SymbolType.Imported) ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Data = new byte[] { 0x00 },
                     Size = 1,
-                    Patches = new ReadOnlyCollection<Patch<ushort>>([
+                    Patches = [
                         new Patch<ushort>() {
                             Size = 1,
                             Location = 0,
@@ -434,9 +410,9 @@ public sealed class LinkerTests
                                 Expression.SymbolAdress(new SymbolId(0)),
                             ],
                         },
-                    ])
+                    ]
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -454,14 +430,13 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 3,
                     Data = new byte[] { 0x01 },
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -477,8 +452,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 1,
@@ -491,7 +465,7 @@ public sealed class LinkerTests
                     Alignment = 4,
                     Data = new byte[] { 0x02 },
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -507,8 +481,7 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = 0x10,
@@ -517,7 +490,7 @@ public sealed class LinkerTests
                     Region = _Text,
                     Size = 0xFFF7,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -535,13 +508,12 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Sections = new[]
-            {
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Size = (ushort)size,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -557,11 +529,8 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Symbols = new[] {
-                new Symbol(Anchor, SymbolType.Internal),
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [ new Symbol(Anchor, SymbolType.Internal) ],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     SymbolAddresses = new Dictionary<SymbolId, ushort>() {
@@ -570,7 +539,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x02, 0x01 },
                     Size = 1,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
@@ -587,11 +556,8 @@ public sealed class LinkerTests
         var module = new Module<ushort>()
         {
             Name = "TestModule",
-            Symbols = new[] {
-                new Symbol(Anchor, SymbolType.Internal),
-            }.ToImmutableArray(),
-            Sections = new[]
-            {
+            Symbols = [new Symbol(Anchor, SymbolType.Internal)],
+            Sections = [
                 new Section<ushort>() {
                     Region = _Text,
                     Origin = 0x0000,
@@ -601,7 +567,7 @@ public sealed class LinkerTests
                     Data = new byte[] { 0x01 },
                     Size = 1,
                 },
-            }.ToImmutableArray()
+            ]
         };
 
         using var ms = new MemoryStream();
