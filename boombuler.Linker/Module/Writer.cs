@@ -120,8 +120,6 @@ namespace boombuler.Linker.Module
 
         public void Flush()
         {
-            if (fOffset == 0)
-                return;
             fStream.Write(fBuffer.Slice(0, fOffset));
             fOffset = 0;
         }
