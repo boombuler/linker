@@ -1,9 +1,9 @@
-﻿using System;
+﻿namespace boombuler.Linker.Module;
+
+using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using boombuler.Linker.Patches;
-
-namespace boombuler.Linker.Module;
 
 public class ModuleSerializer<TAddr>
     where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, IShiftOperators<TAddr, int, TAddr>
@@ -18,10 +18,7 @@ public class ModuleSerializer<TAddr>
 
     static ModuleSerializer()
     {
-        var addrLength = (byte)Marshal.SizeOf<TAddr>();
-        if (!(addrLength is 1 or 2 or 4 or 8))
-            throw new InvalidOperationException("Unsupported address size");
-        MagicNumber[^1] = addrLength;
+        MagicNumber[^1] = (byte)Marshal.SizeOf<TAddr>();
     }
 
     public void Serialize(Module<TAddr> module, Stream target)

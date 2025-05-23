@@ -1,6 +1,6 @@
-﻿using boombuler.Linker.Module;
+﻿namespace boombuler.Linker.Tests;
 
-namespace boombuler.Linker.Tests;
+using boombuler.Linker.Module;
 
 [TestClass]
 public class ValueTypeRangeChecks

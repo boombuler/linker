@@ -2,11 +2,11 @@
 
 using System.Numerics;
 
-class PatchRt<TAddr> 
+public class PatchRuntime<TAddr> 
     where TAddr : INumberBase<TAddr>
 {
     private readonly Func<SymbolId, TAddr> fResolveSymbol;
-    public PatchRt(Func<SymbolId, TAddr> resolveSymbol)
+    public PatchRuntime(Func<SymbolId, TAddr> resolveSymbol)
     {
         ArgumentNullException.ThrowIfNull(resolveSymbol);
 
@@ -28,9 +28,7 @@ class PatchRt<TAddr>
 
     protected virtual void WriteResult(byte targetSize, ulong value, Stream target)
     {
-        // Stryker disable equality
         while (targetSize-- > 0)
-        // Stryker restore equality
         {
             target.WriteByte((byte)value);
             value >>= 8;

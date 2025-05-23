@@ -1,7 +1,6 @@
 ﻿namespace boombuler.Linker.Tests;
 
 using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Numerics;
 using boombuler.Linker.Module;
 using boombuler.Linker.Patches;
@@ -142,6 +141,77 @@ public class SerializerTests
             0x04,                               // 0x37: Data Length
             0x01, 0x02, 0x03, 0x04,             // 0x38: Data
             0x00,                               // 0x3C: Patch Count
+        }, mod);
+    }
+
+    [TestMethod]
+    public void Not_passing_a_Module__Throws_an_Exception()
+    {
+        using var stream = new MemoryStream();
+        var serializer = new ModuleSerializer<uint>();
+        Assert.ThrowsException<ArgumentNullException>(() => serializer.Serialize(null!, stream));
+    }
+
+    [TestMethod]
+    public void Not_passing_a_Stream__Throws_an_Exception()
+    {
+        var serializer = new ModuleSerializer<uint>();
+        var module = new Module<uint>()
+        {
+            Name = "😀",
+            Symbols = [],
+            Sections = []
+        };
+
+        Assert.ThrowsException<ArgumentNullException>(() => serializer.Serialize(module, null!));
+    }
+
+    [TestMethod]
+    public void Patch_Parameters__Encodes_as_small_as_possible()
+    {
+        var mod = Serialize(new Module<ushort>()
+        {
+            Name = "😀",
+            Symbols = [],
+            Sections = [
+                new Section<ushort>() {
+                    Region = new RegionName(".bss"),
+                    Alignment = 1,
+                    Size = 0xFF,
+                    Origin = 0x1234,
+                    Patches = [
+                        new Patch<ushort>(){
+                            Size = 1,
+                            Location = 5,
+                            Expressions = [
+                                Expression.Push(0xFFFF),
+                                Expression.Push(0xFFFFFFFF),
+                                Expression.Push(0xFF),
+                                Expression.Push(0x12FFFFFFFF),
+                            ]
+                        }
+                    ]
+                },
+            ]
+        });
+        CollectionAssert.AreEqual(new byte[] {
+            0x42, 0x4C, 0x4B, 0x01, 0x02,                        // 0x00: Magic Number + Address Length
+            0x04, 0xF0, 0x9F, 0x98, 0x80,                        // 0x05: Module Name
+            0x00, 0x01,                                          // 0x0A: Symbol + Section Count
+            // Section 1
+            0x04, 0x2E, 0x62, 0x73, 0x73,                        // 0x0C: Region Name
+            0x00,                                                // 0x11: Symbol Address Count
+            0x01, 0x34, 0x12,                                    // 0x12: Origin
+            0x01, 0x00,                                          // 0x15: Alignment
+            0xFF, 0x00,                                          // 0x17: Size
+            0x00,                                                // 0x19: Data Length
+            0x01,                                                // 0x1A: Patch Count
+            0x05, 0x00, 0x01,                                    // 0x1B: Patch Location + Size
+            0x04,                                                // 0x1E: Expression Count
+            0x20, 0xFF, 0xFF,                                    // 0x1F: Push 0xFFFF
+            0x40, 0xFF, 0xFF, 0xFF, 0xFF,                        // 0x22: Push 0xFFFFFFFF
+            0x10, 0xFF,                                          // 0x27: Push 0xFF
+            0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x00, 0x00, 0x00 // 0x29: Push 0x1FFFFFFFF
         }, mod);
     }
 }

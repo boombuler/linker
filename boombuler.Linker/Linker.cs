@@ -16,8 +16,8 @@ public class Linker<TAddr>
     private readonly ITargetConfiguration<TAddr> fTargetSystem;
     private readonly FrozenDictionary<Region<TAddr>, TAddr> fRegionEnd;
 
-    private static readonly PatchRt<TAddr> StaticPatchRuntime =
-        new PatchRt<TAddr>(s => throw new InvalidOperationException($"Unable to resolve symbol {s}")); 
+    private static readonly PatchRuntime<TAddr> StaticPatchRuntime =
+        new PatchRuntime<TAddr>(s => throw new InvalidOperationException($"Unable to resolve symbol {s}")); 
 
     class ResolvedSection
     {
@@ -74,7 +74,7 @@ public class Linker<TAddr>
             start = AssignOrigins(start, fRegionEnd[region], regionMap[region.Name]);
         }
 
-        var patchers = CreatePatchRuntimes(sections);
+        var patchers = CreatePatchRuntimesForModules(sections);
 
         WriteOutput(target, patchers, regionMap);
     }
@@ -90,7 +90,7 @@ public class Linker<TAddr>
         }
     }
 
-    private static Dictionary<Module<TAddr>, PatchRt<TAddr>> CreatePatchRuntimes(List<ResolvedSection> sections)
+    private IReadOnlyDictionary<Module<TAddr>, PatchRuntime<TAddr>> CreatePatchRuntimesForModules(List<ResolvedSection> sections)
     {
         var symAddrs =
             from sect in sections
@@ -108,7 +108,7 @@ public class Linker<TAddr>
             .Where(s => s.Symbol.Type == SymbolType.Exported)
             .ToLookup(s => s.Symbol.Name, s => new { s.Address, ModuleName = s.Module.Name });
 
-        var runtimes = new Dictionary<Module<TAddr>, PatchRt<TAddr>>();
+        var runtimes = new Dictionary<Module<TAddr>, PatchRuntime<TAddr>>();
 
         foreach (var mod in sections.Select(s => s.Module).Distinct())
         {
@@ -135,29 +135,42 @@ public class Linker<TAddr>
                     throw new InvalidOperationException($"Symbol {sym.Name} is not defined in module {mod.Name}.");
             }
 
-            runtimes[mod] = new PatchRt<TAddr>(s => modAddresses[s]);
+            runtimes[mod] = CreatePatchRuntime(s => modAddresses[s]);
         }
         return runtimes;
     }
 
-    private void WriteOutput(Stream target, Dictionary<Module<TAddr>, PatchRt<TAddr>> patchers, ILookup<RegionName, ResolvedSection> regionMap)
+    protected virtual PatchRuntime<TAddr> CreatePatchRuntime(Func<SymbolId, TAddr> symbolAddressResolver)
+        => new(symbolAddressResolver);
+
+    private void WriteOutput(Stream target, IReadOnlyDictionary<Module<TAddr>, PatchRuntime<TAddr>> patchers, ILookup<RegionName, ResolvedSection> regionMap)
     {
         var pos = TAddr.Zero;
         void FillTo(TAddr newPos)
         {
+            const int FillBufferSize = 128;
             var delta = int.CreateTruncating(newPos - pos);
-            for (int i = 0; i < delta; i++)
-                target.WriteByte(0x00);
+            Span<byte> buffer = stackalloc byte[FillBufferSize];
+            // Stryker disable once Statement: The buffer might contain uninitialized data, that should not leak to the output.
+            buffer.Clear();
+            
+            // Stryker disable once Equality: Mutating the > to >= does not change the behavior, but the code would run a little slower.
+            while (delta > FillBufferSize)
+            {
+                target.Write(buffer);
+                delta -= FillBufferSize;
+            }
+            target.Write(buffer.Slice(0, delta));
             pos = newPos;
         }
 
+        bool firstRegion = true;
         foreach (var region in fTargetSystem.Regions.Where(r => r.Output))
         {
-            if (region.StartAddress is TAddr start)
-            {
-                if (pos == TAddr.Zero)
-                    pos = start;
-            }
+            if (region.StartAddress is TAddr start && firstRegion)
+                pos = start;
+
+            firstRegion = false;
 
             foreach (var sect in regionMap[region.Name].OrderBy(s => s.Origin))
             {
@@ -165,6 +178,7 @@ public class Linker<TAddr>
 
                 ReadOnlyMemory<byte> data = sect.Section.Data;
                 var expectedLength = int.CreateTruncating(sect.Section.Size);
+                // Stryker disable once Equality: Mutating the < to <= does not change the behavior, but the code would run a little slower.
                 if (data.Length < expectedLength)
                 {
                     var paddedData = new byte[expectedLength];
@@ -187,16 +201,17 @@ public class Linker<TAddr>
         }
     }
 
-    private TAddr AssignOrigins(TAddr regionStart, TAddr regionEnd, IEnumerable<ResolvedSection> sections)
+    private TAddr AssignOrigins(TAddr firstUsableAddress, TAddr lastUsableAddress, IEnumerable<ResolvedSection> sections)
     {
+        // used space including start but excluding end.
         var usedSpace = new List<(TAddr start, TAddr end)>();
-        if (regionStart != TAddr.Zero)
-            usedSpace.Add((TAddr.Zero, regionStart));
+        if (firstUsableAddress != TAddr.Zero)
+            usedSpace.Add((TAddr.Zero, firstUsableAddress));
 
         foreach (var sect in sections.Where(s => s.Origin.HasValue))
         {
             var addr = sect.Origin!.Value;
-            if (addr < regionStart)
+            if (addr < firstUsableAddress)
                 throw new InvalidOperationException($"Section origin can not be set to 0x{addr:X}. The address is not in the destination region.");
             usedSpace.Add((addr, addr + sect.Section.Size));
         }
@@ -214,18 +229,28 @@ public class Linker<TAddr>
             sect.Origin = addr;
 
             var endAddr = addr + sect.Section.Size;
-            if (endAddr < addr || endAddr > regionEnd)
+
+            // Stryker disable once Equality: Changing the comparison to <= would have the same effect.
+            // But would require a value larger then the max value of the address datatype.
+            if (endAddr < addr)
+                throw new InvalidOperationException($"Unable to link {sect.Section.Region.Value}. Address space overflows.");
+
+            if ((endAddr - TAddr.One) > lastUsableAddress)
                 throw new InvalidOperationException($"Unable to link {sect.Section.Region.Value}. Not enough space.");
 
             var range = (addr, endAddr);
 
+            // Stryker disable once Equality: changing the comparison to `>=` would not change a thing because the code above will not 
+            // set two sections on the same starting index. We just want the next one with a larger start address.
             var idx = usedSpace.FindIndex(o => o.start > addr);
             if (idx == -1)
                 usedSpace.Add(range);
             else
                 usedSpace.Insert(idx, range);
         }
-        return usedSpace[^1].end;
+        if (usedSpace.Count > 0)
+            return usedSpace[^1].end;
+        return firstUsableAddress;
     }
 
     private static TAddr Align(TAddr addr, TAddr alignment)

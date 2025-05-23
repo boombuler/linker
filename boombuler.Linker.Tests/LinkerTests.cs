@@ -499,7 +499,6 @@ public sealed class LinkerTests
 
     [TestMethod]
     [DataRow(0xFFFFu)]
-    [DataRow(0x000Au)]
     [DataRow(0x000Bu)]
     public void Oversized_Sections_in_fixed_size_Regions__throw_an_Exception(uint size)
     {
@@ -572,5 +571,150 @@ public sealed class LinkerTests
 
         using var ms = new MemoryStream();
         Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    public void Larger_Sections__are_placed_first()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget());
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Text,
+                    Data = new byte[] { 0x02 },
+                    Size = 1,
+                },
+
+                new Section<ushort>() {
+                    Region = _Text,
+                    Origin = 0x0A,
+                    Data = new byte[] { 0x01, 0x01, 0x01 },
+                    Size = 3,
+                },
+
+                new Section<ushort>() {
+                    Region = _Text,
+                    Data = new byte[] { 0x03, 0x03, 0x03, 0x03 },
+                    Size = 4,
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+        CollectionAssert.AreEqual(new byte[] { 0x03, 0x03, 0x03, 0x03, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01 }, ms.ToArray());
+    }
+
+    [TestMethod]
+    public void Section_filling_the_last_byte_of_the_region__links_without_exceptions()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(textStart: 0x00, dataStart: 0x05));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 5,
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+    }
+
+    [TestMethod]
+    public void Section_filling_the_last_byte_of_the_address_space__links_without_exceptions()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(textStart: 0x00, dataStart: 0xFF00));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 0xFF,
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+    }
+
+    [TestMethod]
+    public void Section_not_fitting_the_region__throw_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(textStart: 0x00, dataStart: 0x05));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Text,
+                    Size = 10,
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    public void Section_overflowing_the_address_space__throw_an_Exception()
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(textStart: 0, dataStart: 0xFF00));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Data,
+                    Size = 0x0100,
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        Assert.ThrowsException<InvalidOperationException>(() => linker.Link([module], ms));
+    }
+
+    [TestMethod]
+    [DataRow(0x0010u)]
+    [DataRow(0x0080u)]
+    [DataRow(0x0100u)]
+    public void Empty_spaces_between_regions__are_filled_with_zeros(uint dataStart)
+    {
+        var linker = new Linker<ushort>(new SimpleTarget(textStart: 0, dataStart: (ushort)dataStart));
+
+        var module = new Module<ushort>()
+        {
+            Name = "TestModule",
+            Sections = [
+                new Section<ushort>() {
+                    Region = _Data,
+                    Size = 1,
+                    Data = new byte[]{ 0x01 }
+                },
+            ]
+        };
+
+        using var ms = new MemoryStream();
+        linker.Link([module], ms);
+
+        Assert.AreEqual(dataStart + 1, ms.Length);
+        var result = ms.ToArray();
+        Assert.AreEqual(0x01, result[^1]);
+        for (int i = 0; i < result.Length-1; i++)
+            Assert.AreEqual(0x00, result[i]);
     }
 }
