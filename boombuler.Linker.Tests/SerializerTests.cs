@@ -1,5 +1,6 @@
 ﻿namespace boombuler.Linker.Tests;
 
+using System.Buffers.Binary;
 using System.Collections.Frozen;
 using System.Numerics;
 using boombuler.Linker.Module;
@@ -145,7 +146,7 @@ public class SerializerTests
     }
 
     [TestMethod]
-    public void Not_passing_a_Module__Throws_an_Exception()
+    public void Not_passing_a_Module_to_Serialize__Throws_an_Exception()
     {
         using var stream = new MemoryStream();
         var serializer = new ModuleSerializer<uint>();
@@ -153,7 +154,7 @@ public class SerializerTests
     }
 
     [TestMethod]
-    public void Not_passing_a_Stream__Throws_an_Exception()
+    public void Not_passing_a_Stream_to_Serialize__Throws_an_Exception()
     {
         var serializer = new ModuleSerializer<uint>();
         var module = new Module<uint>()
@@ -213,5 +214,34 @@ public class SerializerTests
             0x10, 0xFF,                                          // 0x27: Push 0xFF
             0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x00, 0x00, 0x00 // 0x29: Push 0x1FFFFFFFF
         }, mod);
+    }
+
+    [TestMethod]
+    public void Not_assing_a_Stream_on_Deserialize__Throws_an_Exception()
+    {
+        var serializer = new ModuleSerializer<uint>();
+        Assert.ThrowsException<ArgumentNullException>(() => _ = serializer.Deserialize(null!));
+    }
+
+    [TestMethod]
+    [DataRow(0x42_4C_4B_01_01_00_00_00u, false)]
+    [DataRow(0x42_4C_4B_00_02_00_00_00u, false)]
+    [DataRow(0x42_4C_3B_01_02_00_00_00u, false)]
+    [DataRow(0x42_1C_4B_01_02_00_00_00u, false)]
+    [DataRow(0x02_4C_4B_01_02_00_00_00u, false)]
+    [DataRow(0x42_4C_4B_01_02_00_00_00u, true)]
+    public void Deserialize_checks_for_MagicNumber(ulong data, bool headerValid)
+    {
+        using var ms = new MemoryStream();
+        Span<byte> buffer = stackalloc byte[sizeof(ulong)];
+        BinaryPrimitives.WriteUInt64BigEndian(buffer, data);
+        ms.Write(buffer);
+        ms.Position = 0;
+
+        var serializer = new ModuleSerializer<ushort>();
+        if (headerValid) 
+            _ = serializer.Deserialize(ms);
+        else
+            Assert.ThrowsException<ArgumentException>(() => serializer.Deserialize(ms));
     }
 }

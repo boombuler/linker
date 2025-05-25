@@ -1,6 +1,7 @@
 ﻿namespace boombuler.Linker.Module;
 
 using System;
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using boombuler.Linker.Patches;
@@ -13,8 +14,10 @@ public class ModuleSerializer<TAddr>
         0x01,             // Version 1
         0x00              // Address Size
     ];
+    private static readonly Index VersionIdx = new Index(3);
+    private static readonly Index AddressLengthIdx = new Index(4);
 
-    private static byte AddressLength => MagicNumber[^1];
+    private static byte AddressLength => MagicNumber[AddressLengthIdx];
 
     static ModuleSerializer()
     {
@@ -117,5 +120,56 @@ public class ModuleSerializer<TAddr>
         writer.WriteByte((byte)symbol.Type);
         writer.WriteString(symbol.Name.Global ?? string.Empty);
         writer.WriteString(symbol.Name.Local ?? string.Empty);
+    }
+
+
+    public Module<TAddr> Deserialize(Stream source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        using var binaryReader = new BinaryReader(source, System.Text.Encoding.UTF8, leaveOpen: true);
+        ValidateFileHeader(binaryReader);
+
+        var moduleName = binaryReader.ReadString();
+        var symbols = ReadSymbols(binaryReader, binaryReader.Read7BitEncodedInt()).ToImmutableArray();
+        var sections = ReadSections(binaryReader, binaryReader.Read7BitEncodedInt()).ToImmutableArray();
+        return new Module<TAddr>()
+        {
+            Name = moduleName,
+            Symbols = symbols,
+            Sections = sections,
+        };
+    }
+
+    private IEnumerable<Section<TAddr>> ReadSections(BinaryReader binaryReader, int count)
+    { 
+        yield break; 
+    }
+
+    private IEnumerable<Symbol> ReadSymbols(BinaryReader reader, int count)
+    {
+        while(count-- > 0)
+        {
+            var type = (SymbolType)reader.ReadByte();
+            if (!Enum.IsDefined(type))
+                throw new ArgumentException($"Invalid Symbol-Type {type}");
+            string globalName = reader.ReadString() ?? string.Empty;
+            string? localName = reader.ReadString() is string s and not "" ? s : null;
+            yield return new Symbol(new SymbolName(globalName, localName), type);
+        }
+    }
+
+    private static void ValidateFileHeader(BinaryReader binaryReader)
+    {
+        Span<byte> buff = stackalloc byte[MagicNumber.Length];
+        int read = binaryReader.Read(buff);
+        if (read < MagicNumber.Length || !buff[0..3].SequenceEqual(MagicNumber[0..3]))
+            throw new ArgumentException("Invalid Module File");
+
+        if (buff[VersionIdx] != 1)
+            throw new ArgumentException($"File Version {buff[VersionIdx]} not supported");
+
+        if (buff[AddressLengthIdx] != AddressLength)
+            throw new ArgumentException($"Address Length missmatch. (Expected {AddressLength} got {buff[AddressLengthIdx]}");
     }
 }
