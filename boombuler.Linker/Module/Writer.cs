@@ -105,10 +105,19 @@ public ref struct Writer
         }
     }
 
-    public void Write(ReadOnlySpan<byte> buffer)
+    public void Write(params ReadOnlySpan<byte> buffer)
     {
-        Flush();
-        fStream.Write(buffer);
+        if (buffer.Length <= fBuffer.Length)
+        {
+            EnsureBuffer(buffer.Length);
+            buffer.CopyTo(fBuffer.Slice(fOffset));
+            fOffset += buffer.Length;
+        }
+        else
+        {
+            Flush();
+            fStream.Write(buffer);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
