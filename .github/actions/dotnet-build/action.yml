@@ -1,0 +1,48 @@
+name: 'Build .NET project'
+description: 'Restores, builds, optionally packs a .NET project'
+inputs:
+  dotnet-version:
+    description: '.NET SDK version'
+    required: true
+  build-version:
+    description: 'Version to pass to the build (optional)'
+    required: false
+  do-pack:
+    description: 'Whether to run dotnet pack (true/false)'
+    required: false
+    default: 'false'
+  configuration:
+    description: 'The configuration used to compile'
+    required: false
+    default: 'Release'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      shell: bash
+
+    - name: Build
+      run: |
+        if [[ -z "${{ inputs.build-version }}" ]]; then
+          dotnet build --no-restore -c ${{ inputs.configuration }}
+        else
+          dotnet build --no-restore -c ${{ inputs.configuration }} /p:Version=${{ inputs.build-version }}
+        fi
+      shell: bash
+
+    - name: Pack
+      if: ${{ inputs.do-pack == 'true' }}
+      run: |
+        if [[ -z "${{ inputs.build-version }}" ]]; then
+          dotnet pack --no-build -c ${{ inputs.configuration }}
+        else
+          dotnet pack --no-build -c ${{ inputs.configuration }} /p:PackageVersion=${{ inputs.build-version }}
+        fi
+      shell: bash
