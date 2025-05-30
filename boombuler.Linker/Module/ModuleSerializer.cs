@@ -4,6 +4,7 @@ using System;
 using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using boombuler.Linker;
 using boombuler.Linker.Patches;
 
 public class ModuleSerializer<TAddr>

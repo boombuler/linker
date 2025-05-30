@@ -1,4 +1,4 @@
-﻿namespace boombuler.Linker.Module;
+﻿namespace boombuler.Linker;
 
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
@@ -13,6 +13,8 @@ public ref struct Writer
     private Span<byte> fBuffer;
     private readonly Stream fStream;
     private int fOffset;
+
+    public readonly long Position => fStream.Position + fOffset;
 
     public Writer(Span<byte> buffer, Stream stream)
     {
@@ -76,7 +78,7 @@ public ref struct Writer
         // and if we have enough space in the buffer, we can write it directly
 
         // Stryker disable once Equality: Modification from `<=` to `<` will also work but might be slower.
-        if (value.Length <= (127 / 3))
+        if (value.Length <= 127 / 3)
         {
             EnsureBuffer(128);
             var target = fBuffer.Slice(fOffset + 1);
