@@ -1,6 +1,7 @@
 ﻿namespace boombuler.Linker.Module;
 
 using System;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -8,7 +9,7 @@ using boombuler.Linker;
 using boombuler.Linker.Patches;
 
 public class ModuleSerializer<TAddr>
-    where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, IShiftOperators<TAddr, int, TAddr>
+    where TAddr : struct, IUnsignedNumber<TAddr>, INumberBase<TAddr>, IShiftOperators<TAddr, int, TAddr>, IBitwiseOperators<TAddr, TAddr, TAddr>
 {
     private static readonly byte[] MagicNumber = [ 
         0x42, 0x4C, 0x4B, // BLK
@@ -144,7 +145,72 @@ public class ModuleSerializer<TAddr>
 
     private IEnumerable<Section<TAddr>> ReadSections(BinaryReader binaryReader, int count)
     { 
-        yield break; 
+        for (int i = 0; i < count; i++)
+        {
+            var region = binaryReader.ReadString() ?? string.Empty;
+            int symbolCount = binaryReader.Read7BitEncodedInt();
+            var symbolAddresses = new Dictionary<SymbolId, TAddr>(symbolCount);
+            for (int j = 0; j < symbolCount; j++)
+            {
+                var id = new SymbolId(binaryReader.Read7BitEncodedInt());
+                symbolAddresses[id] = ReadAddr(binaryReader);
+            }
+
+            bool hasOrigin = binaryReader.ReadBoolean();
+            TAddr? origin = hasOrigin ? ReadAddr(binaryReader) : null;
+            var alignment = ReadAddr(binaryReader);
+            var size = ReadAddr(binaryReader);
+            int dataLength = binaryReader.Read7BitEncodedInt();
+            byte[] data = binaryReader.ReadBytes(dataLength);
+            var patches = ReadPatches(binaryReader, binaryReader.Read7BitEncodedInt());
+
+            yield return new Section<TAddr>() {
+                Region = new RegionName(region),
+                SymbolAddresses = symbolAddresses.ToFrozenDictionary(),
+                Origin = origin,
+                Alignment = alignment,
+                Size = size,
+                Data = data,
+                Patches = patches
+            };
+        }
+    }
+
+    private ImmutableArray<Patch<TAddr>> ReadPatches(BinaryReader binaryReader, int patchCount)
+    {
+        var patches = ImmutableArray.CreateBuilder<Patch<TAddr>>(patchCount);
+        for (int i = 0; i < patchCount; i++)
+        {
+            var location = ReadAddr(binaryReader);
+            byte sizeOfPatch = binaryReader.ReadByte();
+            int exprCount = binaryReader.Read7BitEncodedInt();
+            var expressions = new Expression[exprCount];
+            for (int j = 0; j < exprCount; j++)
+                expressions[j] = ReadExpression(binaryReader);
+            patches.Add(new Patch<TAddr>()
+            {
+                Location = location,
+                Size = sizeOfPatch,
+                Expressions = expressions
+            });
+        }
+            
+        return patches.ToImmutable();
+    }
+
+    private Expression ReadExpression(BinaryReader reader)
+    {
+        var op = reader.ReadByte();
+        var type = (ExpressionType)(op & 0x0F);
+        ulong arg = ((op & 0xF0) >> 4) switch
+        {
+            1 => reader.ReadByte(),
+            2 => reader.ReadUInt16(),
+            3 => reader.ReadUInt32(),
+            4 => reader.ReadUInt64(),
+            _ => 0,
+        };
+        return new Expression { Type = type, Value = arg };
     }
 
     private IEnumerable<Symbol> ReadSymbols(BinaryReader reader, int count)
@@ -160,10 +226,25 @@ public class ModuleSerializer<TAddr>
         }
     }
 
+    private TAddr ReadAddr(BinaryReader binaryReader)
+    {
+        TAddr addr = TAddr.Zero;
+        for (int i = 0; i < AddressLength; i++)
+        {
+            byte b = binaryReader.ReadByte();
+            // Stryker disable once Assignment: |= results in the same value as ^= as addr is initialized with zero.
+            addr |= TAddr.CreateTruncating(b) << (i * 8);
+        }
+        return addr;
+    }
+
     private static void ValidateFileHeader(BinaryReader binaryReader)
     {
         Span<byte> buff = stackalloc byte[MagicNumber.Length];
         int read = binaryReader.Read(buff);
+        // Stryker disable once Equality: Leaving out the length check will 
+        // work in almost all cases, but since the stack alloc might contain
+        // a valid magic number, we need to check the length as well.
         if (read < MagicNumber.Length || !buff[0..3].SequenceEqual(MagicNumber[0..3]))
             throw new ArgumentException("Invalid Module File");
 

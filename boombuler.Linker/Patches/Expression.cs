@@ -42,29 +42,6 @@ public readonly struct Expression
     }
     // Stryker restore all
 
-    public static Expression Read(ref ReadOnlySpan<byte> buffer)
-    {
-        ReadOnlySpan<byte> Read(ref ReadOnlySpan<byte>buffer, int count)
-        {
-            if (buffer.Length < count)
-                throw new ArgumentException("Buffer is too small", nameof(buffer));
-            var result = buffer[..count];
-            buffer = buffer[count..];
-            return result;
-        }
-
-        var op = Read(ref buffer, 1)[0];
-        var type = (ExpressionType)(op & 0x0F);
-        ulong arg = ((op & 0xF0) >> 4) switch {
-            1 => Read(ref buffer, 1)[0],
-            2 => BitConverter.ToUInt16(Read(ref buffer, 2)),
-            4 => BitConverter.ToUInt32(Read(ref buffer, 4)),
-            8 => BitConverter.ToUInt64(Read(ref buffer, 8)),
-            _ => 0L,
-        };
-        return new Expression { Type = type, Value = arg };
-    }
-
     public static Expression Add => new Expression { Type = ExpressionType.Add };
     public static Expression Sub => new Expression { Type = ExpressionType.Sub };
     public static Expression Mul => new Expression { Type = ExpressionType.Mul };
