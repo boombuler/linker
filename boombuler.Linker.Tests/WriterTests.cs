@@ -151,4 +151,50 @@ public class WriterTests
         CollectionAssert.AreEqual(prefix[..idx], result[prefillBufferSize..(prefillBufferSize+idx)]);
         CollectionAssert.AreEqual(encodedData, result[(prefillBufferSize+idx)..]);
     }
+
+    [TestMethod]
+    public void Position_property_Keeps_track_of_the_current_position_in_the_Stream()
+    {
+        var stream = new MemoryStream();
+        var writer = new Writer(new byte[128], stream);
+        Assert.AreEqual(0, writer.Position);
+        for (int i = 1; i < 500; i++)
+        {
+            writer.WriteByte((byte)i);
+            Assert.AreEqual(i, writer.Position);
+        }
+    }
+
+    [TestMethod]
+    public void Writing_huge_blobs__flushes_the_Writer()
+    {
+        var stream = new MemoryStream();
+        var writer = new Writer(new byte[128], stream);
+        writer.WriteByte(0x01);
+        Assert.AreEqual(0, stream.Position);
+        Assert.AreEqual(1, writer.Position);
+
+        var hugeBuffer = new byte[512];
+        
+        writer.Write(hugeBuffer);
+        Assert.AreEqual(513, stream.Position);
+        Assert.AreEqual(513, writer.Position);
+    }
+
+    [TestMethod]
+    public void Writing_blobs_same_size_as_buffer__flushes_the_buffer_first()
+    {
+        var stream = new MemoryStream();
+        var writer = new Writer(new byte[128], stream);
+        writer.WriteByte(0x01);
+        Assert.AreEqual(0, stream.Position);
+        Assert.AreEqual(1, writer.Position);
+
+        var buffer = new byte[128];
+
+        writer.Write(buffer);
+        Assert.AreEqual(1, stream.Position);
+        Assert.AreEqual(129, writer.Position);
+    }
+
 }
